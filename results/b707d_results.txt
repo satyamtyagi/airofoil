@@ -1,0 +1,4 @@
+# Airfoil: b707d
+# Reynolds: 100000
+# Mach: 0.0
+#    Alpha        CL        CD       CDp        CM
