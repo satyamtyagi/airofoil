@@ -345,16 +345,16 @@ def run_dashboard():
     
     # Open browser after a short delay
     def open_browser_custom():
-        webbrowser.open_new("http://127.0.0.1:8051/")
+        webbrowser.open_new("http://127.0.0.1:8052/")
     
     Timer(1, open_browser_custom).start()
     
     # Run the server - FIXED: use app.run() instead of app.run_server()
     print("Starting dashboard server...")
     print("Please wait for your browser to open automatically.")
-    print("If it doesn't open, navigate to http://127.0.0.1:8051/")
+    print("If it doesn't open, navigate to http://127.0.0.1:8052/")
     
-    app.run(debug=False, use_reloader=False, port=8051)
+    app.run(debug=False, use_reloader=False, port=8052)
 
 if __name__ == "__main__":
     run_dashboard()
