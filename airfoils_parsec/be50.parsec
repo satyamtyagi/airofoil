@@ -1,0 +1,13 @@
+# PARSEC parameters for be50
+# Fit error: 0.004137
+rLE = 0.100000
+Xup = 0.495224
+Yup = 0.056919
+YXXup = -0.499809
+Xlo = 0.376912
+Ylo = -0.040397
+YXXlo = 0.500096
+Xte = 0.950000
+Yte = 0.050000
+Yte' = -0.003760
+Δyte'' = 0.000000

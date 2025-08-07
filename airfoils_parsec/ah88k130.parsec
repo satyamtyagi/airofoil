@@ -1,0 +1,13 @@
+# PARSEC parameters for ah88k130
+# Fit error: 0.006521
+rLE = 0.100000
+Xup = 0.490600
+Yup = 0.267939
+YXXup = -0.100369
+Xlo = 0.181127
+Ylo = -0.300000
+YXXlo = 0.000000
+Xte = 0.950000
+Yte = -0.050000
+Yte' = 0.200000
+Δyte'' = 0.500000

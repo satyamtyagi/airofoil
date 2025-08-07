@@ -1,0 +1,13 @@
+# PARSEC parameters for ag23
+# Fit error: 0.002764
+rLE = 0.100000
+Xup = 0.449538
+Yup = 0.167231
+YXXup = -0.499914
+Xlo = 0.100000
+Ylo = -0.010007
+YXXlo = 0.500213
+Xte = 0.950000
+Yte = 0.000470
+Yte' = 0.000026
+Δyte'' = 0.000039

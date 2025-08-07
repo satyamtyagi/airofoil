@@ -1,0 +1,13 @@
+# PARSEC parameters for ag38
+# Fit error: 0.002914
+rLE = 0.100000
+Xup = 0.495771
+Yup = 0.103085
+YXXup = -0.500032
+Xlo = 0.293701
+Ylo = -0.010000
+YXXlo = 0.500361
+Xte = 0.950000
+Yte = 0.004932
+Yte' = -0.000283
+Δyte'' = 0.000000

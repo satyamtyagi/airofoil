@@ -1,0 +1,13 @@
+# PARSEC parameters for jx-gs-15
+# Fit error: 0.001968
+rLE = 0.100000
+Xup = 0.426916
+Yup = 0.104068
+YXXup = -0.499967
+Xlo = 0.375235
+Ylo = -0.010000
+YXXlo = 0.500230
+Xte = 0.950000
+Yte = 0.050000
+Yte' = -0.004411
+Δyte'' = 0.000000

@@ -1,0 +1,13 @@
+# PARSEC parameters for la5055
+# Fit error: 0.008991
+rLE = 0.100000
+Xup = 0.528686
+Yup = 0.149697
+YXXup = -0.500013
+Xlo = 0.353506
+Ylo = -0.010000
+YXXlo = 0.500115
+Xte = 0.950000
+Yte = 0.000608
+Yte' = -0.000072
+Δyte'' = 0.000007

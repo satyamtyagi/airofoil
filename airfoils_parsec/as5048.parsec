@@ -1,0 +1,13 @@
+# PARSEC parameters for as5048
+# Fit error: 0.008905
+rLE = 0.100000
+Xup = 0.504312
+Yup = 0.106974
+YXXup = -0.499836
+Xlo = 0.383970
+Ylo = -0.074018
+YXXlo = 0.499959
+Xte = 0.950000
+Yte = -0.006102
+Yte' = 0.000502
+Δyte'' = 0.000421

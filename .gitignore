@@ -46,3 +46,7 @@ Thumbs.db
 # Generated visualizations
 # Uncomment if you don't want to include visualizations in git
 # *.png
+
+# Large data files
+*.h5
+*.hdf5

@@ -1,0 +1,13 @@
+# PARSEC parameters for l1003
+# Fit error: 0.009174
+rLE = 0.100000
+Xup = 0.525041
+Yup = 0.182875
+YXXup = -0.499982
+Xlo = 0.211979
+Ylo = -0.010000
+YXXlo = 0.500226
+Xte = 0.950000
+Yte = 0.001344
+Yte' = -0.000156
+Δyte'' = 0.000001

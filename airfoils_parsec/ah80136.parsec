@@ -1,0 +1,13 @@
+# PARSEC parameters for ah80136
+# Fit error: 0.005497
+rLE = 0.100000
+Xup = 0.484349
+Yup = 0.263561
+YXXup = -0.112453
+Xlo = 0.191050
+Ylo = -0.015391
+YXXlo = 0.000000
+Xte = 0.950000
+Yte = -0.050000
+Yte' = 0.200000
+Δyte'' = 0.500000

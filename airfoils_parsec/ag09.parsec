@@ -1,0 +1,13 @@
+# PARSEC parameters for ag09
+# Fit error: 0.000917
+rLE = 0.100000
+Xup = 0.239480
+Yup = 0.010000
+YXXup = -0.000269
+Xlo = 0.131020
+Ylo = -0.018425
+YXXlo = 2.741524
+Xte = 0.950000
+Yte = 0.008003
+Yte' = -0.200000
+Δyte'' = 0.000000

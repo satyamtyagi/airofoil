@@ -1,0 +1,13 @@
+# PARSEC parameters for coanda1
+# Fit error: 0.003255
+rLE = 0.100000
+Xup = 0.479316
+Yup = 0.067943
+YXXup = -0.499691
+Xlo = 0.370547
+Ylo = -0.012112
+YXXlo = 0.500567
+Xte = 0.950000
+Yte = 0.050000
+Yte' = -0.003258
+Δyte'' = 0.000000

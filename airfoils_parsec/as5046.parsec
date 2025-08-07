@@ -1,0 +1,13 @@
+# PARSEC parameters for as5046
+# Fit error: 0.006913
+rLE = 0.100000
+Xup = 0.490471
+Yup = 0.110064
+YXXup = -0.499561
+Xlo = 0.392697
+Ylo = -0.066411
+YXXlo = 0.499929
+Xte = 0.950000
+Yte = -0.020413
+Yte' = 0.001666
+Δyte'' = 0.001114

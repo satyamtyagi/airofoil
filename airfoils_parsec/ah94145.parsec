@@ -1,0 +1,13 @@
+# PARSEC parameters for ah94145
+# Fit error: 0.008745
+rLE = 0.100000
+Xup = 0.517318
+Yup = 0.165752
+YXXup = -0.499938
+Xlo = 0.179800
+Ylo = -0.010000
+YXXlo = 0.500453
+Xte = 0.950000
+Yte = 0.002662
+Yte' = -0.000287
+Δyte'' = 0.000002

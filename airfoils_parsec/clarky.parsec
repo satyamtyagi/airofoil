@@ -1,0 +1,13 @@
+# PARSEC parameters for clarky
+# Fit error: nan
+rLE = 0.010000
+Xup = 0.900000
+Yup = 0.300000
+YXXup = -0.500000
+Xlo = 0.451926
+Ylo = -0.030255
+YXXlo = 0.500000
+Xte = 1.000000
+Yte = 0.000000
+Yte' = 0.000000
+Δyte'' = 0.000000

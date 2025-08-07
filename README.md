@@ -24,12 +24,22 @@ This toolkit provides a complete workflow for airfoil analysis through two compl
 - `compare_predictions.py` - Generate comparison visualizations between ML predictions and XFOIL
 - `train_surrogate.py` - Retrain the surrogate model on your XFOIL dataset
 
+### PARSEC Parameter Sweep
+- `parsec_to_dat.py` - Convert PARSEC parameters to airfoil coordinates
+- `parsec_fit.py` - Fit PARSEC parameters to existing airfoil geometries
+- `generate_parsec_variations.py` - Generate airfoil variations by modifying PARSEC parameters
+- `parsec_parameter_sweep.py` - Perform efficient parameter sweeps using HDF5 database and surrogate model
+- `visualize_parameter_relationships.py` - Create visualizations of parameter-performance relationships
+- `visualize_sweep_3d.py` - Interactive 3D visualization of top-performing airfoils from parameter sweep
+
 ## Directory Structure
 
 - `/airfoils_uiuc` - Directory containing airfoil .dat files
 - `/results` - Directory where analysis results are stored
 - `/models` - Directory containing PyTorch model files
 - `/demo_results` - Directory containing visualization outputs from model demonstrations
+- `/parsec_results` - Directory containing PARSEC parameter statistics and fits
+- `/parameter_sweep_results` - Directory containing parameter sweep results and visualizations
 
 ## Requirements
 
@@ -133,6 +143,39 @@ This generates visualizations comparing the original and retrained models agains
 python train_surrogate.py
 ```
 This trains a new surrogate model using your airfoil geometry files and XFOIL results.
+
+### 5. PARSEC Parameter Sweep
+
+The PARSEC parameterization system allows for efficient exploration of the airfoil design space using a small set of meaningful parameters.
+
+#### Run a parameter sweep with the surrogate model:
+```
+python parsec_parameter_sweep.py --params "rLE,Xup,Yup,Xlo,Ylo" --steps 5
+```
+Options:
+- `--params`: Comma-separated list of PARSEC parameters to vary
+- `--steps`: Number of steps for each parameter
+- `--batch`: Batch size for surrogate processing
+- `--output`: Output HDF5 database filename
+
+This will:
+- Generate all combinations of the specified PARSEC parameters
+- Store them efficiently in an HDF5 database
+- Convert parameters to coordinates in memory without creating intermediate files
+- Process each airfoil through the surrogate model
+- Generate visualizations of top performers
+
+#### Visualize parameter relationships:
+```
+python visualize_parameter_relationships.py
+```
+This creates correlation matrices and performance landscapes showing how parameters affect lift, drag and efficiency.
+
+#### Interactive 3D visualization of results:
+```
+python visualize_sweep_3d.py
+```
+This launches an interactive dashboard with 3D airfoil shapes, performance metrics, and parameter heatmaps.
 
 ## License
 

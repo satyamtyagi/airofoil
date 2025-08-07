@@ -1,0 +1,13 @@
+# PARSEC parameters for w1011
+# Fit error: nan
+rLE = 0.010000
+Xup = 0.429672
+Yup = 0.055012
+YXXup = -0.500000
+Xlo = 0.426124
+Ylo = -0.054994
+YXXlo = 0.500000
+Xte = 1.000000
+Yte = 0.000000
+Yte' = 0.000000
+Δyte'' = 0.000000

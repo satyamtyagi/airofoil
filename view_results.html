@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Airfoil Surrogate Model Comparison</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        h1 { color: #2c3e50; text-align: center; }
+        h2 { color: #3498db; margin-top: 30px; border-bottom: 1px solid #ddd; padding-bottom: 10px; }
+        .airfoil-section { background-color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .image-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; margin-top: 15px; }
+        .image-card { background: white; padding: 10px; border: 1px solid #ddd; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); width: 45%; }
+        .image-card img { max-width: 100%; height: auto; }
+        .image-title { font-weight: bold; text-align: center; margin-bottom: 10px; color: #34495e; }
+        .description { margin-top: 15px; color: #555; font-size: 0.9em; text-align: center; }
+    </style>
+</head>
+<body>
+    <h1>Airfoil Surrogate Model vs. XFOIL Comparison</h1>
+    
+    <div class="airfoil-section">
+        <h2>A18SM Airfoil Analysis</h2>
+        <div class="image-container">
+            <div class="image-card">
+                <div class="image-title">Coefficient Comparison</div>
+                <img src="demo_results/a18sm_coefficient_comparison.png">
+                <div class="description">Comparison of lift, drag and moment coefficients predicted by surrogate models vs. XFOIL</div>
+            </div>
+            <div class="image-card">
+                <div class="image-title">Coefficient Table</div>
+                <img src="demo_results/a18sm_coefficient_table.png">
+                <div class="description">Tabulated comparison of coefficient predictions and errors</div>
+            </div>
+            <div class="image-card">
+                <div class="image-title">Drag Detailed Analysis</div>
+                <img src="demo_results/a18sm_drag_detailed.png">
+                <div class="description">Detailed analysis of drag prediction accuracy</div>
+            </div>
+            <div class="image-card">
+                <div class="image-title">Model Reconstructions</div>
+                <img src="demo_results/a18sm_original_reconstruction.png">
+                <div class="description">Original model airfoil geometry reconstruction</div>
+            </div>
+            <div class="image-card">
+                <div class="image-title">Retrained Reconstruction</div>
+                <img src="demo_results/a18sm_retrained_reconstruction.png">
+                <div class="description">Retrained model airfoil geometry reconstruction</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="airfoil-section">
+        <h2>AG13 Airfoil Analysis</h2>
+        <div class="image-container">
+            <div class="image-card">
+                <div class="image-title">Coefficient Comparison</div>
+                <img src="demo_results/ag13_coefficient_comparison.png">
+                <div class="description">Comparison of lift, drag and moment coefficients predicted by surrogate models vs. XFOIL</div>
+            </div>
+            <div class="image-card">
+                <div class="image-title">Coefficient Table</div>
+                <img src="demo_results/ag13_coefficient_table.png">
+                <div class="description">Tabulated comparison of coefficient predictions and errors</div>
+            </div>
+            <div class="image-card">
+                <div class="image-title">Drag Detailed Analysis</div>
+                <img src="demo_results/ag13_drag_detailed.png">
+                <div class="description">Detailed analysis of drag prediction accuracy</div>
+            </div>
+            <div class="image-card">
+                <div class="image-title">Model Reconstructions</div>
+                <img src="demo_results/ag13_original_reconstruction.png">
+                <div class="description">Original model airfoil geometry reconstruction</div>
+            </div>
+            <div class="image-card">
+                <div class="image-title">Retrained Reconstruction</div>
+                <img src="demo_results/ag13_retrained_reconstruction.png">
+                <div class="description">Retrained model airfoil geometry reconstruction</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="airfoil-section">
+        <h2>HS1606 Airfoil Analysis</h2>
+        <div class="image-container">
+            <div class="image-card">
+                <div class="image-title">Coefficient Comparison</div>
+                <img src="demo_results/hs1606_coefficient_comparison.png">
+                <div class="description">Comparison of lift, drag and moment coefficients predicted by surrogate models vs. XFOIL</div>
+            </div>
+            <div class="image-card">
+                <div class="image-title">Coefficient Table</div>
+                <img src="demo_results/hs1606_coefficient_table.png">
+                <div class="description">Tabulated comparison of coefficient predictions and errors</div>
+            </div>
+            <div class="image-card">
+                <div class="image-title">Drag Detailed Analysis</div>
+                <img src="demo_results/hs1606_drag_detailed.png">
+                <div class="description">Detailed analysis of drag prediction accuracy</div>
+            </div>
+            <div class="image-card">
+                <div class="image-title">Model Reconstructions</div>
+                <img src="demo_results/hs1606_original_reconstruction.png">
+                <div class="description">Original model airfoil geometry reconstruction</div>
+            </div>
+            <div class="image-card">
+                <div class="image-title">Retrained Reconstruction</div>
+                <img src="demo_results/hs1606_retrained_reconstruction.png">
+                <div class="description">Retrained model airfoil geometry reconstruction</div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

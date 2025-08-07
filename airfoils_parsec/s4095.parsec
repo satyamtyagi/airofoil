@@ -1,0 +1,13 @@
+# PARSEC parameters for s4095
+# Fit error: 0.003656
+rLE = 0.100000
+Xup = 0.465403
+Yup = 0.183092
+YXXup = -0.492558
+Xlo = 0.100000
+Ylo = -0.010000
+YXXlo = 0.502554
+Xte = 0.950000
+Yte = 0.006554
+Yte' = -0.000673
+Δyte'' = 0.000044

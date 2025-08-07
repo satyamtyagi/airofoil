@@ -1,0 +1,13 @@
+# PARSEC parameters for ag47ct02r
+# Fit error: 0.000794
+rLE = 0.100000
+Xup = 0.253341
+Yup = 0.010000
+YXXup = -0.000023
+Xlo = 0.130879
+Ylo = -0.024249
+YXXlo = 3.661749
+Xte = 0.950000
+Yte = 0.008453
+Yte' = -0.200000
+Δyte'' = 0.000000

@@ -1,0 +1,13 @@
+# PARSEC parameters for clarkysm
+# Fit error: 0.005405
+rLE = 0.100000
+Xup = 0.493853
+Yup = 0.127824
+YXXup = -0.499964
+Xlo = 0.278502
+Ylo = -0.010000
+YXXlo = 0.500572
+Xte = 0.950000
+Yte = 0.006931
+Yte' = -0.000707
+Δyte'' = 0.000000

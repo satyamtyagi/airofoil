@@ -1,0 +1,13 @@
+# PARSEC parameters for ag53
+# Fit error: 0.002277
+rLE = 0.100000
+Xup = 0.438692
+Yup = 0.142223
+YXXup = -0.499957
+Xlo = 0.100000
+Ylo = -0.010000
+YXXlo = 0.500345
+Xte = 0.950000
+Yte = -0.000167
+Yte' = 0.000146
+Δyte'' = 0.000155

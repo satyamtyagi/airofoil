@@ -1,0 +1,13 @@
+# PARSEC parameters for supermarine371i
+# Fit error: 0.004950
+rLE = 0.100000
+Xup = 0.463607
+Yup = 0.148037
+YXXup = -0.499842
+Xlo = 0.308748
+Ylo = -0.010000
+YXXlo = 0.500498
+Xte = 0.950000
+Yte = 0.010243
+Yte' = -0.000829
+Δyte'' = 0.000000

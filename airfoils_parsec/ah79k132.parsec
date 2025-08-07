@@ -1,0 +1,13 @@
+# PARSEC parameters for ah79k132
+# Fit error: 0.006322
+rLE = 0.100000
+Xup = 0.491054
+Yup = 0.268043
+YXXup = -0.100311
+Xlo = 0.181189
+Ylo = -0.300000
+YXXlo = 0.000000
+Xte = 0.950000
+Yte = -0.050000
+Yte' = 0.200000
+Δyte'' = 0.500000

@@ -1,0 +1,13 @@
+# PARSEC parameters for curtisc72
+# Fit error: 0.007731
+rLE = 0.100000
+Xup = 0.585005
+Yup = 0.130455
+YXXup = -0.499617
+Xlo = 0.433616
+Ylo = -0.030992
+YXXlo = 0.500040
+Xte = 0.950000
+Yte = -0.050000
+Yte' = 0.005651
+Δyte'' = 0.002998

@@ -1,0 +1,13 @@
+# PARSEC parameters for ah63k127
+# Fit error: 0.005921
+rLE = 0.100000
+Xup = 0.487159
+Yup = 0.268211
+YXXup = -0.100767
+Xlo = 0.181556
+Ylo = -0.300000
+YXXlo = 0.000000
+Xte = 0.950000
+Yte = -0.050000
+Yte' = 0.200000
+Δyte'' = 0.500000

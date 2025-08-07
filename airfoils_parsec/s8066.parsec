@@ -1,0 +1,13 @@
+# PARSEC parameters for s8066
+# Fit error: 0.002687
+rLE = 0.100000
+Xup = 0.651922
+Yup = 0.010000
+YXXup = -1.411558
+Xlo = 0.281750
+Ylo = -0.036197
+YXXlo = 0.516626
+Xte = 1.049715
+Yte = -0.045190
+Yte' = 0.200000
+Δyte'' = 0.500000

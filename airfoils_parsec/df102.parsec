@@ -1,0 +1,13 @@
+# PARSEC parameters for df102
+# Fit error: 0.004057
+rLE = 0.100000
+Xup = 0.476391
+Yup = 0.189590
+YXXup = -0.495941
+Xlo = 0.100000
+Ylo = -0.011886
+YXXlo = 0.501601
+Xte = 0.950000
+Yte = 0.003949
+Yte' = -0.000374
+Δyte'' = 0.000050

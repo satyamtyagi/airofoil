@@ -1,0 +1,13 @@
+# PARSEC parameters for s8064
+# Fit error: 0.004630
+rLE = 0.100000
+Xup = 0.459457
+Yup = 0.181953
+YXXup = -0.482399
+Xlo = 0.100002
+Ylo = -0.026025
+YXXlo = 0.503410
+Xte = 0.950000
+Yte = 0.013484
+Yte' = -0.001498
+Δyte'' = 0.000091
