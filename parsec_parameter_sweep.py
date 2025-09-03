@@ -34,8 +34,11 @@ from matplotlib.backends.backend_pdf import PdfPages
 import torch
 from scipy.interpolate import interp1d
 
-# Import the ParsecAirfoil class from parsec_to_dat.py
+# Import the ParsecAirfoil class
 from parsec_to_dat import ParsecAirfoil
+# Import airfoil validation functions
+from airfoil_validation import check_self_intersection, calculate_thickness, check_min_thickness, check_max_thickness
+# Imports already added above
 
 # Define directories and files
 STATS_FILE = "parsec_results/parsec_stats.csv"
@@ -75,37 +78,59 @@ def load_parameter_stats():
 
 def generate_parameter_combinations(stats, steps=3, selected_params=None):
     """Generate all combinations of parameter values with n steps each"""
-    # Extract parameter names and their min, max values
-    param_names = stats['param'].tolist()
-    min_values = stats['min'].tolist()
-    max_values = stats['max'].tolist()
-    mean_values = stats['mean'].tolist()
+    print(f"Generating parameter combinations using ranges focused on top-performing airfoils...")
     
-    # Filter parameters if selected_params is provided
-    if selected_params:
-        filtered_params = []
-        filtered_mins = []
-        filtered_maxs = []
-        filtered_means = []
-        
-        for i, param in enumerate(param_names):
-            if param in selected_params:
-                filtered_params.append(param)
-                filtered_mins.append(min_values[i])
-                filtered_maxs.append(max_values[i])
-                filtered_means.append(mean_values[i])
-        
-        param_names = filtered_params
-        min_values = filtered_mins
-        max_values = filtered_maxs
-        mean_values = filtered_means
+    # Use fixed parameter ranges based on real top-performing airfoils
+    # instead of using the statistics from the dataset
+    param_ranges = {
+        'rLE': np.linspace(0.01, 0.15, steps),        # Leading edge radius (0.005-0.2)
+        'Xup': np.linspace(0.2, 0.45, steps),         # Upper crest X position (0.1-0.7)
+        'Yup': np.linspace(0.02, 0.09, steps),        # Upper crest Y position (0.01-0.15)
+        'YXXup': np.linspace(-2.0, 0.0, steps),       # Upper crest curvature (-5.0-1.0)
+        'Xlo': np.linspace(0.1, 0.3, steps),          # Lower crest X position (0.1-0.7)
+        'Ylo': np.linspace(-0.05, -0.01, steps),      # Lower crest Y position (-0.1--0.005)
+        'YXXlo': np.linspace(0.5, 2.5, steps),        # Lower crest curvature (0.0-5.0)
+        'Xte': np.linspace(0.95, 1.0, steps),         # Trailing edge X position (0.9-1.05)
+        'Yte': np.linspace(-0.01, 0.01, steps),       # Trailing edge Y position (near 0)
+        "Yte'": np.linspace(-0.1, 0.1, steps),         # Trailing edge direction (-0.2-0.2)
+        "Δyte''": np.linspace(0.1, 0.3, steps)        # Trailing edge wedge angle (0.05-0.5)
+    }
     
-    # Create parameter value ranges
+    # Determine parameters to vary
+    if selected_params is None:
+        # Vary all parameters
+        selected_params = list(param_ranges.keys())
+    
+    # Get parameter values for selected parameters
+    param_names = []
     param_values = []
-    for i, param in enumerate(param_names):
-        values = np.linspace(min_values[i], max_values[i], steps)
-        param_values.append(values)
     
+    for param in selected_params:
+        if param in param_ranges:
+            param_names.append(param)
+            param_values.append(param_ranges[param])
+        else:
+            # Fallback to statistics for any parameters not in our defined ranges
+            # Find the row index for this parameter
+            idx = stats.index[stats['param'] == param].tolist()[0]
+            
+            # Get mean and standard deviation
+            mean = stats.iloc[idx]['mean']
+            std = stats.iloc[idx]['std']
+            
+            # Create range centered on mean with +/- 1 standard deviation (narrower range)
+            min_val = mean - std
+            max_val = mean + std
+            
+            # Special handling for bounded parameters
+            if param == 'rLE':
+                min_val = max(0.005, min_val)  # Ensure positive
+            
+            # Generate steps values
+            values = np.linspace(min_val, max_val, steps)
+            
+            param_names.append(param)
+            param_values.append(values)
     # Generate all combinations
     combinations = list(itertools.product(*param_values))
     
@@ -129,12 +154,13 @@ def generate_parameter_combinations(stats, steps=3, selected_params=None):
 
 def create_parameter_database(param_names, param_combinations, db_file):
     """Create HDF5 database with all parameter combinations"""
+    # Restore the original function signature to match what's expected in main()
     print(f"Creating parameter database with {len(param_combinations)} combinations...")
     start_time = time.time()
     
     # Create HDF5 file
     with h5py.File(db_file, 'w') as hf:
-        # Store parameter names
+        # Create dataset for parameter names
         dt_params = h5py.special_dtype(vlen=str)
         param_names_ds = hf.create_dataset('param_names', (len(param_names),), dtype=dt_params)
         for i, param in enumerate(param_names):
@@ -183,6 +209,70 @@ def parsec_to_coordinates(params):
     x_coords, y_coords = airfoil.generate_coordinates(100)
     
     return x_coords, y_coords
+
+
+def validate_parsec_parameters(params):
+    """Validate PARSEC parameters based on reasonable ranges"""
+    # Leading edge radius (rLE) - must be positive and within reasonable range
+    # Real airfoils typically have rLE between 0.005 and 0.2
+    if not (0.005 <= params.get('rLE', 0) <= 0.2):
+        return False, f"Leading edge radius out of range: {params.get('rLE', 0)}"
+    
+    # Upper crest X position (Xup) - must be between 0 and Xte
+    # Typically between 0.1 and 0.7 for real airfoils
+    if not (0.1 <= params.get('Xup', 0) <= 0.7):
+        return False, f"Upper crest X position out of range: {params.get('Xup', 0)}"
+    
+    # Upper crest Y position (Yup) - must be positive for standard airfoils
+    # Typically between 0.01 and 0.15 for real airfoils
+    if not (0.01 <= params.get('Yup', 0) <= 0.15):
+        return False, f"Upper crest Y position out of range: {params.get('Yup', 0)}"
+    
+    # Upper crest curvature (YXXup) - typically between -5.0 and 1.0
+    if not (-5.0 <= params.get('YXXup', 0) <= 1.0):
+        return False, f"Upper crest curvature out of range: {params.get('YXXup', 0)}"
+    
+    # Lower crest X position (Xlo) - must be between 0 and Xte
+    # Typically between 0.1 and 0.7 for real airfoils
+    if not (0.1 <= params.get('Xlo', 0) <= 0.7):
+        return False, f"Lower crest X position out of range: {params.get('Xlo', 0)}"
+    
+    # Lower crest Y position (Ylo) - must be negative for standard airfoils
+    # Typically between -0.1 and -0.005 for real airfoils
+    if not (-0.1 <= params.get('Ylo', 0) <= -0.005):
+        return False, f"Lower crest Y position out of range: {params.get('Ylo', 0)}"
+    
+    # Lower crest curvature (YXXlo) - typically between 0.0 and 5.0
+    if not (0.0 <= params.get('YXXlo', 0) <= 5.0):
+        return False, f"Lower crest curvature out of range: {params.get('YXXlo', 0)}"
+    
+    # Trailing edge X position (Xte) - typically around 0.95-1.0
+    if not (0.9 <= params.get('Xte', 1.0) <= 1.05):
+        return False, f"Trailing edge X position out of range: {params.get('Xte', 0)}"
+    
+    # Trailing edge Y position (Yte) - typically close to 0
+    if abs(params.get('Yte', 0)) > 0.02:
+        return False, f"Trailing edge Y position too far from 0: {params.get('Yte', 0)}"
+    
+    # Trailing edge direction (Yte') - typically between -0.2 and 0.2
+    if abs(params.get("Yte'", 0)) > 0.2:
+        return False, f"Trailing edge direction out of range: {params.get('Yte\'', 0)}"
+    
+    # Trailing edge wedge angle (Δyte'') - typically between 0.05 and 0.5
+    if not (0.05 <= abs(params.get("Δyte''", 0.2)) <= 0.5):
+        return False, f"Trailing edge wedge angle out of range: {params.get('Δyte\'', 0)}"
+    
+    # Upper must be above lower surface for physically realistic airfoils
+    if not (params.get('Yup', 0) > abs(params.get('Ylo', 0))):
+        return False, "Upper surface not above lower surface"
+    
+    # Check relationship between parameters (additional physical constraints)
+    # Maximum thickness should be reasonable (approximation check)
+    approx_thickness = params.get('Yup', 0) + abs(params.get('Ylo', 0))
+    if approx_thickness < 0.01 or approx_thickness > 0.25:
+        return False, f"Approximate thickness out of reasonable range: {approx_thickness}"
+    
+    return True, ""
 
 
 # Surrogate model class (from compare_predictions.py)
@@ -272,10 +362,43 @@ def process_with_surrogate(param_batch, batch_indices):
     alpha = 5.0  # 5 degrees
     
     results = []
+    validation_results = []
+    
     for params in param_batch:
+        # First validate the parameters directly
+        valid, reason = validate_parsec_parameters(params)
+        
+        # Skip surrogate model if parameter validation fails
+        if not valid:
+            validation_results.append((valid, reason))
+            results.append((False, [np.nan, np.nan, np.nan, np.nan, alpha]))
+            continue
+        
         # Convert parameters to coordinates
         try:
             x_coords, y_coords = parsec_to_coordinates(params)
+            
+            # ADDED: Geometric validation
+            # Check for self-intersection
+            if not check_self_intersection(x_coords, y_coords):
+                validation_results.append((False, "Self-intersection detected"))
+                results.append((False, [np.nan, np.nan, np.nan, np.nan, alpha]))
+                continue
+                
+            # Check minimum thickness
+            if not check_min_thickness(x_coords, y_coords, min_thickness=0.01):
+                validation_results.append((False, "Thickness below minimum (0.01)"))
+                results.append((False, [np.nan, np.nan, np.nan, np.nan, alpha]))
+                continue
+                
+            # Check maximum thickness
+            if not check_max_thickness(x_coords, y_coords, max_thickness=0.25):
+                validation_results.append((False, "Thickness above maximum (0.25)"))
+                results.append((False, [np.nan, np.nan, np.nan, np.nan, alpha]))
+                continue
+                
+            # All validations passed
+            validation_results.append((True, ""))
             
             # Normalize coordinates for surrogate input
             normalized_coords = normalize_coordinates_for_surrogate(x_coords, y_coords)
@@ -294,7 +417,16 @@ def process_with_surrogate(param_batch, batch_indices):
                 with torch.no_grad():
                     output = _surrogate_model.forward(input_tensor)
                     cl, cd, cm = output.numpy().flatten()
+                    
+                    # Apply realistic drag constraint (minimum Cd = 0.003)
+                    if cd < 0.003:
+                        cd = 0.003
+                    
                     cl_cd = cl/cd if cd > 0 else 0
+                    
+                    # Cap maximum L/D ratio at a realistic value (150)
+                    if cl_cd > 150:
+                        cl_cd = 150
             else:
                 # Generate random results if no model is available
                 cl = np.random.uniform(0.1, 1.5)
@@ -307,7 +439,25 @@ def process_with_surrogate(param_batch, batch_indices):
             
         except Exception as e:
             print(f"Error processing parameters: {str(e)}")
+            validation_results.append((False, f"Error: {str(e)}"))
             results.append((False, [np.nan, np.nan, np.nan, np.nan, alpha]))
+    
+    # Print validation statistics
+    total = len(validation_results)
+    valid_count = sum(1 for valid, _ in validation_results if valid)
+    print(f"Validation summary: {valid_count}/{total} ({valid_count/total*100:.1f}%) valid parameter sets")
+    
+    # Count rejection reasons
+    reasons = {}
+    for valid, reason in validation_results:
+        if not valid:
+            reasons[reason] = reasons.get(reason, 0) + 1
+    
+    # Print top rejection reasons
+    if reasons:
+        print("Top rejection reasons:")
+        for reason, count in sorted(reasons.items(), key=lambda x: x[1], reverse=True)[:5]:
+            print(f"  {reason}: {count}")
     
     return batch_indices, results
 
@@ -323,8 +473,26 @@ def run_parameter_sweep(db_file, batch_size=1000):
         results = hf['results']
         status = hf['status']
         
+        # Create a new dataset for validation status if it doesn't exist
+        if 'validation_status' not in hf:
+            validation_status = hf.create_dataset('validation_status', 
+                                    (param_values.shape[0],), 
+                                    dtype='int8', 
+                                    fillvalue=0)
+            # Create a dataset for validation reasons
+            dt_reasons = h5py.special_dtype(vlen=str)
+            validation_reasons = hf.create_dataset('validation_reasons', 
+                                    (param_values.shape[0],), 
+                                    dtype=dt_reasons)
+        else:
+            validation_status = hf['validation_status']
+            validation_reasons = hf['validation_reasons']
+        
         total_combinations = param_values.shape[0]
         print(f"Total parameter combinations to process: {total_combinations}")
+        
+        valid_count = 0
+        processed_count = 0
         
         # Process in batches
         for batch_start in tqdm(range(0, total_combinations, batch_size)):
@@ -337,16 +505,37 @@ def run_parameter_sweep(db_file, batch_size=1000):
                 param_dict = {param_names[j]: param_values[i, j] for j in range(len(param_names))}
                 param_batch.append(param_dict)
             
-            # Process with surrogate model
-            batch_indices, batch_results = process_with_surrogate(param_batch, batch_indices)
+            # First validate all parameters directly
+            for i, params in zip(batch_indices, param_batch):
+                valid, reason = validate_parsec_parameters(params)
+                validation_status[i] = 1 if valid else 0
+                validation_reasons[i] = reason if not valid else ""
+                if valid:
+                    valid_count += 1
             
-            # Store results
-            for i, (success, result) in zip(batch_indices, batch_results):
-                if success:
-                    results[i] = result
-                    status[i] = 1  # Processed successfully
-                else:
-                    status[i] = -1  # Error occurred
+            # Filter batch to include only valid parameter sets
+            valid_indices = []
+            valid_params = []
+            for i, params in zip(batch_indices, param_batch):
+                if validation_status[i] == 1:
+                    valid_indices.append(i)
+                    valid_params.append(params)
+            
+            # Process only valid parameter sets with surrogate model
+            if valid_params:
+                processed_count += len(valid_params)
+                batch_indices, batch_results = process_with_surrogate(valid_params, valid_indices)
+                
+                # Store results
+                for i, (success, result) in zip(batch_indices, batch_results):
+                    if success:
+                        results[i] = result
+                        status[i] = 1  # Processed successfully
+                    else:
+                        status[i] = -1  # Error occurred
+            
+        print(f"Parameter sweep complete: {valid_count}/{total_combinations} ({valid_count/total_combinations*100:.1f}%) valid parameter sets")
+        print(f"Successfully processed: {processed_count} parameter sets")
     
     print("Parameter sweep completed")
     return db_file
@@ -354,46 +543,87 @@ def run_parameter_sweep(db_file, batch_size=1000):
 
 def export_results(db_file):
     """Export results from the database to CSV"""
-    print("Exporting results to CSV...")
+    print(f"Exporting results from database: {db_file}")
     
     # Open the database
     with h5py.File(db_file, 'r') as hf:
         param_names = [name.decode('utf-8') for name in hf['param_names']]
-        param_values = hf['param_values'][:]
-        results = hf['results'][:]
-        status = hf['status'][:]
+        param_values = hf['param_values']
+        results = hf['results']
+        status = hf['status']
         
-        # Create a DataFrame
-        df_data = {}
+        # Get validation status if available
+        validation_status = hf.get('validation_status', None)
+        validation_reasons = hf.get('validation_reasons', None)
         
-        # Add parameters
-        for i, param in enumerate(param_names):
-            df_data[param] = param_values[:, i]
+        total_combinations = param_values.shape[0]
+        print(f"Total parameter combinations: {total_combinations}")
         
-        # Add results
-        df_data['cl'] = results[:, 0]
-        df_data['cd'] = results[:, 1]
-        df_data['cm'] = results[:, 2]
-        df_data['cl_cd'] = results[:, 3]
-        df_data['alpha'] = results[:, 4]
-        df_data['status'] = status
+        # Count successfully processed combinations
+        successful = np.sum(status[:] == 1)
+        print(f"Successfully processed: {successful}/{total_combinations} combinations")
         
-        df = pd.DataFrame(df_data)
+        # Count valid airfoils if validation data exists
+        if validation_status is not None:
+            valid_count = np.sum(validation_status[:] == 1)
+            print(f"Valid airfoils: {valid_count}/{total_combinations} ({valid_count/total_combinations*100:.1f}%)")
+            
+            # Count top rejection reasons
+            if validation_reasons is not None:
+                reasons = {}
+                for i in range(total_combinations):
+                    if validation_status[i] == 0:
+                        reason = validation_reasons[i]
+                        reasons[reason] = reasons.get(reason, 0) + 1
+                
+                if reasons:
+                    print("Top rejection reasons:")
+                    for reason, count in sorted(reasons.items(), key=lambda x: x[1], reverse=True)[:5]:
+                        print(f"  {reason}: {count}")
         
-        # Save to CSV
-        csv_file = os.path.join(RESULTS_DIR, 'parsec_sweep_results.csv')
-        df.to_csv(csv_file, index=False)
+        # Create dataframe for export
+        data = []
+        for i in range(total_combinations):
+            if status[i] == 1:  # Only include successful results
+                row = {param: param_values[i, j] for j, param in enumerate(param_names)}
+                row['cl'] = results[i, 0]
+                row['cd'] = results[i, 1]
+                row['cm'] = results[i, 2]
+                row['cl_cd'] = results[i, 3]
+                row['alpha'] = results[i, 4]
+                
+                # Add validation status if available
+                if validation_status is not None:
+                    row['valid'] = validation_status[i]
+                
+                data.append(row)
         
-        print(f"Results exported to: {csv_file}")
-        
-        # Also save a filtered version with only successful results
-        df_success = df[df['status'] == 1]
-        csv_success_file = os.path.join(RESULTS_DIR, 'parsec_sweep_results_success.csv')
-        df_success.to_csv(csv_success_file, index=False)
-        
-        print(f"Successful results ({len(df_success)} of {len(df)}) exported to: {csv_success_file}")
-        
-        return csv_file, csv_success_file
+        # Convert to dataframe
+        if data:
+            df = pd.DataFrame(data)
+            
+            # Sort by lift-to-drag ratio
+            df_sorted = df.sort_values('cl_cd', ascending=False)
+            
+            # Save to CSV files
+            all_file = os.path.join(RESULTS_DIR, "parsec_sweep_results.csv")
+            success_file = os.path.join(RESULTS_DIR, "parsec_sweep_results_success.csv")
+            
+            df.to_csv(all_file, index=False)
+            df_sorted.to_csv(success_file, index=False)
+            
+            print(f"Exported all results to: {all_file}")
+            print(f"Exported sorted results to: {success_file}")
+            
+            # Print top performers
+            print("\nTop 10 performers by lift-to-drag ratio:")
+            top_10 = df_sorted.head(10)[['cl_cd', 'cl', 'cd'] + param_names]
+            print(top_10.to_string())
+            
+            return df_sorted
+        else:
+            print("No successful results to export")
+            return None
 
 
 def create_visualizations(db_file):

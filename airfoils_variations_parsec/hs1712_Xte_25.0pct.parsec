@@ -1,0 +1,12 @@
+# PARSEC parameters for hs1712 with Xte +25%
+rLE = 0.100000
+Xup = 0.512788
+Yup = 0.130125
+YXXup = -0.500005
+Xlo = 0.281705
+Ylo = -0.010000
+YXXlo = 0.500116
+Xte = 1.187500
+Yte = 0.000323
+Yte' = -0.000050
+Δyte'' = 0.000000

@@ -1,0 +1,6 @@
+Geometrically Invalid Airfoil Fits:
+==================================
+
+ag13: Fit error = 1000000.000015
+ag45ct02r: Fit error = 1000000.000021
+ag44ct02r: Fit error = 1000000.000030

@@ -302,7 +302,7 @@ def create_dashboard(top_airfoils, params_to_show):
 
 def open_browser():
     """Open the browser after a short delay"""
-    webbrowser.open_new("http://127.0.0.1:8050/")
+    webbrowser.open_new("http://127.0.0.1:8051/")
 
 
 def main():
@@ -336,7 +336,7 @@ def main():
     Timer(1, open_browser).start()
     
     # Run the app
-    app.run(debug=False)
+    app.run(debug=False, port=8051)
 
 
 if __name__ == "__main__":

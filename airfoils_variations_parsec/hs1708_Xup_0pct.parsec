@@ -1,0 +1,12 @@
+# PARSEC parameters for hs1708 with Xup 0%
+rLE = 0.100000
+Xup = 0.482909
+Yup = 0.095973
+YXXup = -0.500004
+Xlo = 0.390835
+Ylo = -0.016899
+YXXlo = 0.500044
+Xte = 0.950000
+Yte = 0.002726
+Yte' = -0.000184
+Δyte'' = 0.000000

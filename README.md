@@ -27,10 +27,16 @@ This toolkit provides a complete workflow for airfoil analysis through two compl
 ### PARSEC Parameter Sweep
 - `parsec_to_dat.py` - Convert PARSEC parameters to airfoil coordinates
 - `parsec_fit.py` - Fit PARSEC parameters to existing airfoil geometries
+- `parsec_fit_improved.py` - Enhanced PARSEC fitting with better optimization
 - `generate_parsec_variations.py` - Generate airfoil variations by modifying PARSEC parameters
+- `generate_parsec_percentage_variations.py` - Generate percentage-based variations of top-performing airfoils
+- `convert_dat_to_parsec.py` - Convert airfoil coordinates (.dat) to PARSEC parameters
+- `convert_parsec_to_dat.py` - Convert PARSEC parameters to airfoil coordinates (.dat)
 - `parsec_parameter_sweep.py` - Perform efficient parameter sweeps using HDF5 database and surrogate model
 - `visualize_parameter_relationships.py` - Create visualizations of parameter-performance relationships
 - `visualize_sweep_3d.py` - Interactive 3D visualization of top-performing airfoils from parameter sweep
+- `visualize_unified_airfoils_3d.py` - Unified 3D visualization of real and parameter sweep airfoils
+- `visualize_top_performers.py` - Visualize top-performing airfoils and their parameters
 
 ## Directory Structure
 

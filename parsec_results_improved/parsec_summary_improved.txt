@@ -1,0 +1,27 @@
+PARSEC Parameter Ranges Summary (Improved Implementation)
+===================================================
+
+Total airfoils processed: 3
+Successful fits: 3
+Geometrically valid fits: 0
+Invalid geometry fits: 3
+Failed fits: 0
+
+Parameter Ranges:
+----------------
+rLE         : Min = 0.005060, Max = 0.010000, Mean = 0.008353, StdDev = 0.002329
+Xup         : Min = 0.262902, Max = 0.281134, Mean = 0.272833, StdDev = 0.007532
+Yup         : Min = 0.051772, Max = 0.056692, Mean = 0.053677, StdDev = 0.002157
+YXXup       : Min = -0.500000, Max = -0.500000, Mean = -0.500000, StdDev = 0.000000
+Xlo         : Min = 0.104024, Max = 0.163359, Mean = 0.139204, StdDev = 0.025447
+Ylo         : Min = -0.023368, Max = -0.014771, Mean = -0.018932, StdDev = 0.003515
+YXXlo       : Min = 0.500000, Max = 0.500000, Mean = 0.500000, StdDev = 0.000000
+Xte         : Min = 1.000000, Max = 1.000000, Mean = 1.000000, StdDev = 0.000000
+Yte         : Min = 0.000000, Max = 0.005124, Mean = 0.002141, StdDev = 0.002175
+AlphaTE     : Min = 0.000000, Max = 0.000000, Mean = 0.000000, StdDev = 0.000000
+DeltaAlphaTE: Min = 0.000000, Max = 0.000000, Mean = 0.000000, StdDev = 0.000000
+
+Fit Errors:
+Min Error: 1000000.000015
+Max Error: 1000000.000030
+Mean Error: 1000000.000022

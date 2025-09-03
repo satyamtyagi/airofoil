@@ -1,0 +1,12 @@
+# PARSEC parameters for davissm_Ylo_-0.0050
+rLE = 0.100000
+Xup = 0.473326
+Yup = 0.094136
+YXXup = -0.500003
+Xlo = 0.344816
+Ylo = -0.005000
+YXXlo = 0.499997
+Xte = 0.950000
+Yte = 0.001331
+Yte' = -0.000082
+Δyte'' = 0.000000

@@ -1,23 +1,26 @@
 #!/usr/bin/env python3
 """
-PARSEC Parameter Variation Generator
+PARSEC Parameter Variation Generator - Top Performers
 
 This script:
-1. Reads the min/max/mean PARSEC parameter statistics
-2. Creates systematic variations of PARSEC parameters:
-   - One-at-a-time variations: varies one parameter from min to max while keeping others at mean values
-   - Random combinations: creates random combinations within the parameter space
-3. Generates PARSEC parameter files for all variations
-4. Converts the PARSEC files to airfoil DAT files
+1. Identifies the top 10 real airfoils based on lift-to-drag ratio
+2. Extracts their PARSEC parameters from the airfoils_parsec directory
+3. For each airfoil, creates systematic variations by:
+   - Varying one parameter at a time through its min-max range while keeping others constant
+   - Using 5 steps per parameter to create 50 variations per base airfoil
+4. Validates each variation geometrically by converting PARSEC to coordinates
+5. Runs the surrogate model only on valid shapes
+6. Outputs performance metrics and visualizations of the best variations
 
-This allows exploring the entire PARSEC parameter space in a structured way.
+This approach starts with known high-performing shapes and explores targeted variations
+to identify promising design improvements while ensuring physical validity.
 
 Usage:
   python generate_parsec_variations.py [options]
 
 Options:
-  -s, --steps N    Number of steps for each parameter from min to max (range: 2-10, default: 5)
-  -r, --random N   Number of random parameter combinations to generate (default: 20)
+  -s, --steps N    Number of steps for each parameter variation (default: 5)
+  -t, --top N      Number of top airfoils to use as base shapes (default: 10)
 """
 
 import os
@@ -26,19 +29,27 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import re
-import random
-import subprocess
 import argparse
+import torch
+from scipy.interpolate import interp1d
 from matplotlib.backends.backend_pdf import PdfPages
+import h5py
 
-# Import the PARSEC to DAT conversion functionality from the previous script
+# Import PARSEC functionality
 from parsec_to_dat import ParsecAirfoil
 
+# Import validation and surrogate model functionality
+from parsec_parameter_sweep import validate_parsec_parameters, normalize_coordinates_for_surrogate, load_surrogate_model
+# Import geometric validation functions
+from airfoil_validation import check_self_intersection, calculate_thickness, check_min_thickness, check_max_thickness
+
 # Define directories
-STATS_FILE = "parsec_results/parsec_stats.csv"
-OUTPUT_DIR_PARSEC = "airfoils_generated_parsec"
-OUTPUT_DIR_DAT = "airfoils_generated_dat"
-RESULTS_DIR = "parameter_sweep_results"
+PARSEC_DIR = "airfoils_parsec"
+PERFORMANCE_FILE = "results/airfoil_best_performance.csv"
+OUTPUT_DIR_PARSEC = "airfoils_variations_parsec"
+OUTPUT_DIR_DAT = "airfoils_variations_dat"
+RESULTS_DIR = "variation_results"
+MODELS_DIR = "models"
 
 # Create output directories if they don't exist
 os.makedirs(OUTPUT_DIR_PARSEC, exist_ok=True)
@@ -60,71 +71,172 @@ PARAM_DESCRIPTIONS = {
     "Δyte''": "Trailing Edge Wedge Angle"
 }
 
+# Parameter bounds for variations - from manual analysis of real airfoils
+PARAM_BOUNDS = {
+    "rLE": (0.005, 0.15),      # Leading Edge Radius
+    "Xup": (0.15, 0.5),       # Upper Crest X Position
+    "Yup": (0.01, 0.15),      # Upper Crest Y Position
+    "YXXup": (-1.5, 0.5),     # Upper Crest Curvature
+    "Xlo": (0.1, 0.5),        # Lower Crest X Position
+    "Ylo": (-0.1, -0.005),    # Lower Crest Y Position
+    "YXXlo": (0.2, 3.0),      # Lower Crest Curvature
+    "Xte": (0.9, 1.0),        # Trailing Edge X Position
+    "Yte": (-0.02, 0.02),     # Trailing Edge Y Position
+    "Yte'": (-0.2, 0.2),      # Trailing Edge Direction
+    "Δyte''": (0.05, 0.5)      # Trailing Edge Wedge Angle
+}
 
-def load_parameter_stats():
-    """Load PARSEC parameter statistics from CSV file"""
+
+def get_top_airfoils(n=10):
+    """Get the top N airfoils based on L/D ratio that have PARSEC parameter files available"""
     try:
-        stats = pd.read_csv(STATS_FILE)
-        return stats
-    except FileNotFoundError:
-        print(f"Error: Parameter statistics file not found: {STATS_FILE}")
-        print("Make sure you have run parsec_fit.py first to generate statistics.")
+        # Load airfoil performance data
+        performance_file = 'results/airfoil_best_performance.csv'
+        airfoil_data = pd.read_csv(performance_file)
+        
+        # Get list of available PARSEC files
+        available_parsec_files = set([f.split('.')[0] for f in os.listdir(PARSEC_DIR) if f.endswith('.parsec')])
+        
+        # Filter airfoil data for those with available PARSEC files
+        airfoil_data['has_parsec'] = airfoil_data['airfoil'].apply(lambda x: x in available_parsec_files)
+        filtered_data = airfoil_data[airfoil_data['has_parsec']]
+        
+        # Sort by best L/D ratio and get top N
+        top_airfoils = filtered_data.sort_values(by='best_ld', ascending=False).head(n)
+        
+        print(f"Top {n} airfoils with PARSEC parameters available:")
+        for i, row in top_airfoils.iterrows():
+            print(f"{i+1}. {row['airfoil']}: L/D = {row['best_ld']:.2f} at α={row['best_ld_alpha']}°")
+            
+        return top_airfoils['airfoil'].tolist()
+    
+    except Exception as e:
+        print(f"Error getting top airfoils: {e}")
+        return []
+
+
+def load_parsec_parameters(airfoil_name):
+    """Load PARSEC parameters from a file"""
+    file_path = os.path.join(PARSEC_DIR, f"{airfoil_name}.parsec")
+    
+    if not os.path.exists(file_path):
+        print(f"Error: PARSEC file not found: {file_path}")
         return None
+    
+    parameters = {}
+    with open(file_path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith('#') or not line:
+                continue
+            
+            # Parse parameter name and value
+            parts = line.split('=')
+            if len(parts) == 2:
+                param_name = parts[0].strip()
+                param_value = float(parts[1].strip())
+                parameters[param_name] = param_value
+    
+    return parameters
 
 
-def generate_parameter_variations(stats, steps=5, random_count=20):
-    """Generate parameter variations using one-at-a-time and random approaches"""
+def generate_percentage_variations(base_params, percentages=[0.0, 0.05, 0.10, 0.25]):
+    """Generate parameter variations based on percentage changes"""
+    variations = []
+    base_params_copy = base_params.copy()
+    
+    # Extract airfoil name and remove from parameters to avoid multiplication error
+    airfoil_name = base_params_copy.pop('airfoil', 'unknown')
+    
+    # For each parameter
+    for param in base_params_copy.keys():
+            
+        # Get the base value
+        base_value = base_params_copy[param]
+        
+        # For each percentage change
+        for percentage in percentages:
+            # For 0% variation, include for each parameter to get the full 770 count
+            if percentage == 0.0:
+                # Create a base variant (no change to parameters)
+                variation = base_params_copy.copy()
+                
+                # Add airfoil name back for reference
+                params_with_airfoil = variation.copy()
+                params_with_airfoil['airfoil'] = airfoil_name
+                
+                # Create a dictionary to store variation details
+                variation_details = {
+                    'params': params_with_airfoil,
+                    'name': f"{airfoil_name}_{param}_0pct",
+                    'param': param,
+                    'percent': 0.0,
+                    'value': base_value
+                }
+                
+                variations.append(variation_details)
+                continue
+                
+            # Create variations with positive and negative percentage changes
+            for sign in [1, -1]:
+                # Calculate the new value with percentage change
+                new_value = base_value * (1 + sign * percentage)
+                
+                # Create a new set of parameters with this parameter varied
+                variation = base_params_copy.copy()
+                variation[param] = new_value
+                
+                # Add airfoil name back for reference
+                params_with_airfoil = variation.copy()
+                params_with_airfoil['airfoil'] = airfoil_name
+                
+                # Create a dictionary to store variation details
+                variation_details = {
+                    'params': params_with_airfoil,
+                    'name': f"{airfoil_name}_{param}_{sign * percentage * 100}pct",
+                    'param': param,
+                    'percent': sign * percentage,
+                    'value': new_value
+                }
+                
+                # Add to variations list
+                variations.append(variation_details)
+    
+    return variations
+
+
+def generate_variations(base_airfoil, base_params, steps=5):
+    """Generate parameter variations for the given base airfoil"""
     variations = []
     
-    # Extract parameter names and their min, max, and mean values
-    param_names = stats['Parameter'].tolist()
-    min_values = stats['Min'].tolist()
-    max_values = stats['Max'].tolist()
-    mean_values = stats['Mean'].tolist()
+    # Add the base airfoil first
+    variations.append((f"{base_airfoil}_base", base_params.copy()))
     
-    # Create a base configuration with all parameters at their mean values
-    base_config = {param: mean for param, mean in zip(param_names, mean_values)}
-    
-    # Method 1: One-at-a-time parameter variations
-    print(f"Generating one-at-a-time parameter variations ({steps} steps per parameter)...")
-    for i, param in enumerate(param_names):
-        param_min = min_values[i]
-        param_max = max_values[i]
+    # For each parameter, create steps variations from min to max
+    for param, (min_val, max_val) in PARAM_BOUNDS.items():
+        if param not in base_params:
+            print(f"Warning: Parameter {param} not found in base airfoil {base_airfoil}")
+            continue
         
-        # Create steps evenly spaced values from min to max
-        param_values = np.linspace(param_min, param_max, steps)
+        # Generate evenly spaced values in the parameter range
+        param_values = np.linspace(min_val, max_val, steps)
         
-        for value in param_values:
-            # Create a new configuration based on the base config
-            config = base_config.copy()
-            config[param] = value
+        for val in param_values:
+            # Skip if the value is very close to the original parameter value
+            if abs(val - base_params[param]) < 1e-6:
+                continue
+                
+            # Create a new configuration by copying the base parameters
+            new_params = base_params.copy()
+            new_params[param] = val
             
             # Create a name for this variation
-            name = f"oaat_{param}_{value:.4f}"
+            # Format: airfoil_param_value
+            name = f"{base_airfoil}_{param}_{val:.4f}"
             
             # Add to variations list
-            variations.append((name, config))
+            variations.append((name, new_params))
     
-    # Method 2: Random combinations within the parameter space
-    print(f"Generating {random_count} random parameter combinations...")
-    for i in range(random_count):
-        # Create a new configuration with random values within bounds
-        config = {}
-        for j, param in enumerate(param_names):
-            param_min = min_values[j]
-            param_max = max_values[j]
-            config[param] = param_min + random.random() * (param_max - param_min)
-        
-        # Create a name for this random variation
-        name = f"random_{i+1:03d}"
-        
-        # Add to variations list
-        variations.append((name, config))
-    
-    # Method 3: Add the mean configuration as a reference
-    variations.append(("mean_config", base_config))
-    
-    print(f"Total variations generated: {len(variations)}")
     return variations
 
 
@@ -132,17 +244,40 @@ def create_parsec_files(variations):
     """Create PARSEC parameter files for each variation"""
     print(f"Generating PARSEC parameter files...")
     
-    for name, config in tqdm(variations):
+    for var in tqdm(variations):
         # Create file path
-        file_path = os.path.join(OUTPUT_DIR_PARSEC, f"{name}.parsec")
+        file_path = os.path.join(OUTPUT_DIR_PARSEC, f"{var['base_airfoil']}_{var['varied_param']}_{var['percentage']:.2f}.parsec")
         
         # Write parameters to file
         with open(file_path, 'w') as f:
-            f.write(f"# PARSEC parameters for {name}\n")
-            for param, value in config.items():
+            f.write(f"# PARSEC parameters for {var['base_airfoil']}_{var['varied_param']}_{var['percentage']:.2f}\n")
+            for param, value in var['params'].items():
                 f.write(f"{param} = {value:.6f}\n")
     
-    return [name for name, _ in variations]
+    return [f"{var['base_airfoil']}_{var['varied_param']}_{var['percentage']:.2f}" for var in variations]
+
+
+def validate_airfoil(params):
+    """Validate airfoil parameters and geometry"""
+    # Generate airfoil coordinates from PARSEC parameters
+    airfoil = ParsecAirfoil()
+    for key, value in params.items():
+        if key in airfoil.params and key != 'airfoil':
+            airfoil.params[key] = value
+    
+    # Calculate coefficients and generate coordinates
+    try:
+        airfoil._calculate_coefficients()
+        x_coords, y_coords = airfoil.generate_coordinates(num_points=100)
+        
+        # Check for self-intersection
+        if not check_self_intersection(x_coords, y_coords):
+            return False, "Self-intersection detected"
+            
+        # Skip all other validations as requested
+        return True, "Passed self-intersection check"
+    except Exception as e:
+        return False, f"Failed to generate airfoil coordinates: {str(e)}"
 
 
 def convert_to_dat_files(airfoil_names):
@@ -178,224 +313,399 @@ def convert_to_dat_files(airfoil_names):
             print(f"  Error processing {name}: {str(e)}")
             failure_count += 1
     
-    print(f"Conversion complete:")
-    print(f"  - Successfully converted: {success_count}")
-    print(f"  - Failed conversions: {failure_count}")
+    print(f"Successfully processed {success_count} out of {len(airfoil_names)} variations")
+    print(f"Failed: {failure_count} variations")
+    
+    return success_count
 
 
-def create_parameter_study_visualizations(stats, variations):
-    """Create visualizations of parameter variations"""
-    print("Creating parameter study visualizations...")
+def normalize_coordinates_for_surrogate(x_coords, y_coords, num_points=200):
+    """Normalize airfoil coordinates to exactly num_points for surrogate model
+    The surrogate model ONLY uses y-coordinates as input
     
-    # Extract parameter names
-    param_names = stats['Parameter'].tolist()
-    
-    # Group variations by parameter
-    param_variations = {}
-    for name, config in variations:
-        if name.startswith("oaat_"):
-            # Parse parameter name and value from the variation name
-            parts = name.split('_')
-            if len(parts) >= 3:
-                param = parts[1]
-                if param in param_names:
-                    if param not in param_variations:
-                        param_variations[param] = []
-                    param_variations[param].append((name, config))
-    
-    # Create PDF with visualizations
-    pdf_path = os.path.join(RESULTS_DIR, "parameter_study.pdf")
-    with PdfPages(pdf_path) as pdf:
-        # Create pages for each parameter
-        for param in param_names:
-            if param in param_variations:
-                fig, axes = plt.subplots(2, 3, figsize=(15, 10))
-                fig.suptitle(f"Effect of {PARAM_DESCRIPTIONS.get(param, param)} ({param})", fontsize=16)
-                
-                axes = axes.flatten()
-                
-                # Sort variations by parameter value
-                variations_sorted = sorted(param_variations[param], key=lambda x: [v for k, v in x[1].items() if k == param][0])
-                
-                for i, (name, config) in enumerate(variations_sorted):
-                    if i < len(axes):
-                        # Create airfoil and plot it
-                        airfoil = ParsecAirfoil(name=name)
-                        
-                        # Set parameters directly
-                        for k, v in config.items():
-                            airfoil.params[k] = v
-                        
-                        # Generate airfoil shape
-                        x_airfoil, y_airfoil = airfoil.generate_coordinates(200)
-                        
-                        # Plot
-                        ax = axes[i]
-                        ax.plot(x_airfoil, y_airfoil, 'b-', linewidth=2)
-                        ax.set_aspect('equal')
-                        ax.grid(True, alpha=0.3)
-                        
-                        # Get the varied parameter value
-                        value = config[param]
-                        ax.set_title(f"{param} = {value:.4f}")
-                        
-                        # Highlight the varied parameter effect
-                        ymin, ymax = ax.get_ylim()
-                        if param.startswith('X'):
-                            ax.axvline(x=value, color='r', linestyle='--', alpha=0.5)
-                        elif param.startswith('Y'):
-                            ax.axhline(y=value, color='r', linestyle='--', alpha=0.5)
-                
-                # Turn off any unused subplots
-                for i in range(len(variations_sorted), len(axes)):
-                    axes[i].axis('off')
-                
-                plt.tight_layout(rect=[0, 0, 1, 0.95])
-                pdf.savefig(fig)
-                plt.close(fig)
+    Note: The model expects exactly 200 y-coordinates.
+    """
+    try:
+        # Sort by x-coordinate
+        idx = np.argsort(x_coords)
+        x = x_coords[idx]
+        y = y_coords[idx]
         
-        # Create a reference page
-        fig, ax = plt.subplots(figsize=(12, 6))
-        ax.axis('off')
-        ax.set_title("PARSEC Parameter Study Reference", fontsize=16)
+        # Parametrize by arc length
+        t = np.zeros(len(x))
+        for i in range(1, len(x)):
+            t[i] = t[i-1] + np.sqrt((x[i] - x[i-1])**2 + (y[i] - y[i-1])**2)
         
-        # Create a table with parameter descriptions
-        cells = []
-        for param in param_names:
-            min_val = stats[stats['Parameter'] == param]['Min'].values[0]
-            max_val = stats[stats['Parameter'] == param]['Max'].values[0]
-            mean_val = stats[stats['Parameter'] == param]['Mean'].values[0]
-            cells.append([param, PARAM_DESCRIPTIONS.get(param, ""), 
-                         f"{min_val:.4f}", f"{max_val:.4f}", f"{mean_val:.4f}"])
+        if t[-1] == 0:  # Avoid division by zero
+            return None
+            
+        t = t / t[-1]  # Normalize to [0, 1]
         
-        # Create the table
-        column_labels = ["Parameter", "Description", "Min Value", "Max Value", "Mean Value"]
-        table = ax.table(cellText=cells, colLabels=column_labels, loc='center', cellLoc='center')
-        table.auto_set_font_size(False)
-        table.set_fontsize(10)
-        table.scale(1.2, 1.5)
+        # Interpolate to get evenly spaced points
+        fx = interp1d(t, x, kind='linear')
+        fy = interp1d(t, y, kind='linear')
         
-        pdf.savefig(fig)
-        plt.close(fig)
-    
-    # Create an overview image with sample airfoils
-    fig, axes = plt.subplots(3, 4, figsize=(15, 10))
-    fig.suptitle("Sample Airfoils from Parameter Study", fontsize=16)
-    
-    axes = axes.flatten()
-    
-    # Select a diverse set of airfoils
-    diverse_airfoils = []
-    for param in list(param_variations.keys())[:4]:  # Take first 4 parameters
-        if param in param_variations and len(param_variations[param]) >= 3:
-            # Add the min, middle, and max variations
-            variations_sorted = sorted(param_variations[param], key=lambda x: [v for k, v in x[1].items() if k == param][0])
-            diverse_airfoils.extend([variations_sorted[0], variations_sorted[len(variations_sorted)//2], variations_sorted[-1]])
-    
-    # If we need more airfoils, add random ones
-    for name, _ in variations:
-        if name.startswith("random_"):
-            diverse_airfoils.append((name, dict()))
-        if len(diverse_airfoils) >= 12:
-            break
-    
-    # Plot the diverse set
-    for i, (name, config) in enumerate(diverse_airfoils[:len(axes)]):
-        ax = axes[i]
+        # Generate exactly 200 points (to match the model's expected input)
+        t_new = np.linspace(0, 1, num_points)
+        x_new = fx(t_new)
+        y_new = fy(t_new)
         
-        # Load the airfoil
-        parsec_file = os.path.join(OUTPUT_DIR_PARSEC, f"{name}.parsec")
-        airfoil = ParsecAirfoil(name=name)
+        # The surrogate model only uses y-coordinates as input (200 points)
+        return y_new
+    
+    except Exception as e:
+        print(f"Error normalizing coordinates: {str(e)}")
+        return None
+
+
+def run_surrogate_model(variation_names, variation_parameters):
+    """Run the surrogate model on valid airfoil shapes"""
+    print("Running surrogate model on valid airfoil shapes...")
+    
+    # Load surrogate model
+    surrogate = load_surrogate_model()
+    if surrogate is None:
+        print("Error: Failed to load surrogate model")
+        return {}
+    
+    # Track results
+    results = {}
+    valid_count = 0
+    failure_count = 0
+    
+    # Fixed angle of attack for analysis (matching parsec_parameter_sweep.py)
+    alpha = 5.0  # 5 degrees
+    
+    # Process each variation
+    for name, params in tqdm(zip(variation_names, variation_parameters), total=len(variation_names)):
+        # Validate the airfoil parameters and shape
+        valid, message = validate_airfoil(params)
+        
+        if not valid:
+            # Skip invalid airfoils
+            print(f"Skipping {name}: {message}")
+            failure_count += 1
+            continue
+        
+        # Generate coordinates
+        airfoil = ParsecAirfoil()
+        for param, value in params.items():
+            airfoil.params[param] = value
         
         try:
-            # Load parameters
-            if airfoil.load_from_file(parsec_file):
-                # Generate airfoil shape
-                x_airfoil, y_airfoil = airfoil.generate_coordinates(200)
+            airfoil._calculate_coefficients()
+            x, y = airfoil.generate_coordinates(200)  # Generate coordinates
+            
+            # Normalize coordinates for the surrogate model - use only y coordinates
+            normalized = normalize_coordinates_for_surrogate(x, y)
+            
+            if normalized is None:
+                print(f"Skipping {name}: Failed to normalize coordinates")
+                failure_count += 1
+                continue
+            
+            # Add angle of attack to the normalized coordinates (matching parsec_parameter_sweep.py)
+            input_vector = np.append(normalized, alpha)
+            
+            # Convert to tensor
+            input_tensor = torch.tensor(input_vector, dtype=torch.float32).unsqueeze(0)
+            
+            # Run surrogate model to get predictions
+            with torch.no_grad():
+                predictions = surrogate.forward(input_tensor).squeeze().numpy()
+            
+            # Store results (cl, cd, cm) at AOA=5°
+            cl = predictions[0]
+            cd = predictions[1]
+            cm = predictions[2]
+            
+            # Apply realistic drag constraint (minimum Cd = 0.003) as in parsec_parameter_sweep.py
+            if cd < 0.003:
+                cd = 0.003
+            
+            # Calculate lift-to-drag ratio
+            ld_ratio = cl / cd if cd > 0.0001 else 0
+            
+            # Store results
+            results[name] = {
+                'cl': cl,
+                'cd': cd,
+                'cm': cm,
+                'ld_ratio': ld_ratio
+            }
+            
+            valid_count += 1
+            
+        except Exception as e:
+            print(f"Error processing {name}: {str(e)}")
+            failure_count += 1
+    
+    print(f"Successfully processed {valid_count} out of {len(variation_names)} variations")
+    print(f"Failed variations: {failure_count}")
+    
+    # Save results to HDF5 file
+    with h5py.File(os.path.join(RESULTS_DIR, "variation_results.h5"), 'w') as f:
+        for name, metrics in results.items():
+            group = f.create_group(name)
+            for metric, value in metrics.items():
+                group.attrs[metric] = value
+    
+    print(f"Results saved to {os.path.join(RESULTS_DIR, 'variation_results.h5')}")
+    
+    return results
+
+
+def visualize_results(results, top_airfoils):
+    """Create visualizations of the variation results"""
+    print("Generating result visualizations...")
+    
+    # Create visualizations directory
+    vis_dir = os.path.join(RESULTS_DIR, "visualizations")
+    os.makedirs(vis_dir, exist_ok=True)
+    
+    # Extract data for plotting
+    names = list(results.keys())
+    ld_ratios = [results[name]['ld_ratio'] for name in names]
+    cls = [results[name]['cl'] for name in names]
+    cds = [results[name]['cd'] for name in names]
+    
+    # Sort by lift-to-drag ratio
+    sorted_indices = np.argsort(ld_ratios)[::-1]  # Descending order
+    
+    # Get the top 20 performers
+    top_indices = sorted_indices[:20]
+    top_names = [names[i] for i in top_indices]
+    top_lds = [ld_ratios[i] for i in top_indices]
+    
+    # Print top 10 performers
+    print("\nTop 10 airfoil variations by L/D ratio:")
+    for i in range(min(10, len(top_names))):
+        name = top_names[i]
+        print(f"{i+1}. {name}: L/D = {top_lds[i]:.2f}, CL = {results[name]['cl']:.4f}, CD = {results[name]['cd']:.6f}")
+    
+    # 1. Bar chart of top performers
+    plt.figure(figsize=(14, 8))
+    plt.bar(range(len(top_names)), top_lds)
+    plt.xticks(range(len(top_names)), top_names, rotation=90)
+    plt.xlabel('Airfoil Variation')
+    plt.ylabel('Lift-to-Drag Ratio')
+    plt.title('Top Performing Airfoil Variations')
+    plt.tight_layout()
+    plt.savefig(os.path.join(vis_dir, 'top_performers.png'), dpi=300)
+    plt.close()
+    
+    # 2. Scatter plot of CL vs CD with L/D as color
+    plt.figure(figsize=(12, 10))
+    scatter = plt.scatter(cds, cls, c=ld_ratios, cmap='viridis', alpha=0.8, s=50)
+    
+    # Add colorbar
+    cbar = plt.colorbar(scatter)
+    cbar.set_label('Lift-to-Drag Ratio')
+    
+    # Add labels and title
+    plt.xlabel('Drag Coefficient (CD)')
+    plt.ylabel('Lift Coefficient (CL)')
+    plt.title('Aerodynamic Performance of Airfoil Variations')
+    
+    # Use log scale for CD
+    plt.xscale('log')
+    
+    # Mark top performers
+    for i in top_indices[:5]:
+        plt.annotate(names[i], (cds[i], cls[i]))
+    
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(os.path.join(vis_dir, 'cl_cd_scatter.png'), dpi=300)
+    plt.close()
+    
+    # 3. Parameter influence analysis (which parameters have the biggest impact)
+    # Group results by base airfoil and modified parameter
+    param_impact = {}
+    
+    for name in results.keys():
+        # Skip base airfoils
+        if "_base" in name:
+            continue
+            
+        # Parse the name to get base airfoil and parameter
+        # Format: airfoil_param_value
+        parts = name.split('_')
+        if len(parts) >= 3:
+            base_airfoil = parts[0]
+            param = parts[1]
+            
+            # Initialize nested dict if needed
+            if base_airfoil not in param_impact:
+                param_impact[base_airfoil] = {}
+            if param not in param_impact[base_airfoil]:
+                param_impact[base_airfoil][param] = []
+            
+            # Store the impact on L/D ratio
+            base_name = f"{base_airfoil}_base"
+            if base_name in results:
+                base_ld = results[base_name]['ld_ratio']
+                variation_ld = results[name]['ld_ratio']
+                percent_change = ((variation_ld - base_ld) / base_ld) * 100 if base_ld > 0 else 0
                 
-                # Plot
-                ax.plot(x_airfoil, y_airfoil, 'b-', linewidth=2)
-                ax.set_aspect('equal')
-                ax.grid(True, alpha=0.3)
-                ax.set_title(name)
-        except:
-            ax.text(0.5, 0.5, f"Failed to load {name}", ha='center', va='center')
+                param_impact[base_airfoil][param].append(percent_change)
     
-    # Turn off any unused subplots
-    for i in range(len(diverse_airfoils), len(axes)):
-        axes[i].axis('off')
+    # Calculate average impact for each parameter
+    avg_impact = {}
+    for param in PARAM_DESCRIPTIONS.keys():
+        values = []
+        for airfoil in param_impact:
+            if param in param_impact[airfoil]:
+                values.extend(param_impact[airfoil][param])
+        
+        if values:
+            avg_impact[param] = np.mean(values)
     
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
-    plt.savefig(os.path.join(RESULTS_DIR, "parameter_study_samples.png"), dpi=150)
-    plt.close(fig)
+    # Plot parameter impact
+    plt.figure(figsize=(12, 8))
+    params = list(avg_impact.keys())
+    impacts = [avg_impact[p] for p in params]
     
-    print(f"Visualizations created:")
-    print(f"  - Parameter study PDF: {pdf_path}")
-    print(f"  - Sample airfoils image: {os.path.join(RESULTS_DIR, 'parameter_study_samples.png')}")
+    # Sort by absolute impact
+    sorted_idx = np.argsort(np.abs(impacts))[::-1]  # Descending order
+    params = [params[i] for i in sorted_idx]
+    impacts = [impacts[i] for i in sorted_idx]
+    
+    colors = ['green' if i >= 0 else 'red' for i in impacts]
+    plt.barh(params, impacts, color=colors)
+    plt.axvline(x=0, color='black', linestyle='-', alpha=0.3)
+    plt.xlabel('Average % Change in L/D Ratio')
+    plt.ylabel('Parameter')
+    plt.title('Impact of Parameter Variations on Lift-to-Drag Ratio')
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(os.path.join(vis_dir, 'parameter_impact.png'), dpi=300)
+    plt.close()
+    
+    print(f"Result visualizations saved to {vis_dir}")
 
 
 def parse_arguments():
     """Parse command-line arguments"""
-    parser = argparse.ArgumentParser(
-        description="Generate airfoil variations by sweeping PARSEC parameters from min to max."
-    )
+    parser = argparse.ArgumentParser(description="PARSEC Parameter Variation Generator for Top Airfoils")
     
     parser.add_argument(
-        "-s", "--steps", 
-        type=int, 
+        "-s", "--steps",
+        type=int,
         default=5,
-        help="Number of steps for each parameter from min to max (range: 2-10, default: 5)"
+        help="Number of steps for each parameter variation (default: 5)"
     )
     
     parser.add_argument(
-        "-r", "--random", 
-        type=int, 
-        default=20,
-        help="Number of random parameter combinations to generate (default: 20)"
+        "-t", "--top",
+        type=int,
+        default=10,
+        help="Number of top airfoils to use as base shapes (default: 10)"
+    )
+    
+    parser.add_argument(
+        "-p", "--percentage",
+        action="store_true",
+        help="Use percentage-based variations instead of range-based"
     )
     
     args = parser.parse_args()
     
-    # Validate steps parameter
+    # Validate step count
     if args.steps < 2 or args.steps > 10:
-        parser.error("Steps must be between 2 and 10")
+        print(f"Warning: Invalid step count ({args.steps}). Using default value of 5.")
+        args.steps = 5
     
-    # Validate random parameter
-    if args.random < 0:
-        parser.error("Random count must be non-negative")
+    # Validate top count
+    if args.top < 1 or args.top > 20:
+        print(f"Warning: Invalid top airfoil count ({args.top}). Using default value of 10.")
+        args.top = 10
     
     return args
 
 
 def main():
-    """Main function to execute the parameter study"""
+    """Main function to execute airfoil variations study"""
     # Parse command-line arguments
     args = parse_arguments()
     
-    print(f"Generating parameter variations with {args.steps} steps and {args.random} random combinations...\n")
-    
-    # Load parameter statistics
-    stats = load_parameter_stats()
-    if stats is None:
+    # Get top performing airfoils
+    top_airfoils = get_top_airfoils(args.top)
+    if top_airfoils is None or len(top_airfoils) == 0:
+        print("Error: Failed to get top airfoils")
         return
     
-    # Generate parameter variations
-    variations = generate_parameter_variations(stats, steps=args.steps, random_count=args.random)
+    # Process each top airfoil
+    all_variations = []
+    all_names = []
+    all_params = []
     
-    # Create PARSEC parameter files
-    airfoil_names = create_parsec_files(variations)
+    print(f"\nGenerating variations for {len(top_airfoils)} top airfoils...")
+    for airfoil in top_airfoils:
+        # Load PARSEC parameters
+        base_params = load_parsec_parameters(airfoil)
+        if base_params is None:
+            print(f"Skipping {airfoil}: Could not load PARSEC parameters")
+            continue
+            
+        # Add airfoil name to params for reference
+        base_params['airfoil'] = airfoil
+        
+        # Generate parameter variations based on mode
+        if args.percentage:
+            # Use percentage-based variations
+            variations = generate_percentage_variations(base_params, percentages=[0.0, 0.05, 0.10, 0.25])
+            all_variations.extend(variations)
+            
+            # Generate names and params for each variation
+            for var in variations:
+                # Use the name already created in generate_percentage_variations
+                var_name = var['name']
+                all_names.append(var_name)
+                all_params.append(var['params'])
+                
+            print(f"Generated {len(variations)} percentage-based variations for {airfoil}")
+        else:
+            # Use range-based variations (original method)
+            variations = generate_variations(airfoil, base_params, args.steps)
+            all_variations.extend([{'params': params, 'base_airfoil': airfoil} for _, params in variations])
+            print(f"Generated {len(variations)} range-based variations for {airfoil}")
+        
+    # Create PARSEC parameter files - handle based on variation mode
+    if args.percentage:
+        # For percentage-based variations
+        print(f"Creating PARSEC parameter files for {len(all_variations)} variations...")
+        for var in tqdm(all_variations):
+            # Create file path
+            file_path = os.path.join(OUTPUT_DIR_PARSEC, f"{var['name']}.parsec")
+            
+            # Write parameters to file
+            with open(file_path, 'w') as f:
+                airfoil_name = var['params']['airfoil']
+                param_name = var['param']
+                percent_str = f"{'+' if var['percent'] > 0 else ''}{var['percent']*100:.0f}"
+                f.write(f"# PARSEC parameters for {airfoil_name} with {param_name} {percent_str}%\n")
+                for param, value in var['params'].items():
+                    if param != 'airfoil':  # Skip the airfoil name
+                        f.write(f"{param} = {value:.6f}\n")
+    else:
+        # For range-based variations (original method)
+        create_parsec_files(all_variations)
     
-    # Convert PARSEC files to DAT files
-    convert_to_dat_files(airfoil_names)
+    # Convert to DAT files
+    convert_to_dat_files(all_names)
     
-    # Create parameter study visualizations
-    create_parameter_study_visualizations(stats, variations)
+    # Run surrogate model on valid shapes
+    results = run_surrogate_model(all_names, all_params)
     
-    print("\nParameter study complete!")
-    print(f"PARSEC parameter files: {OUTPUT_DIR_PARSEC} ({len(airfoil_names)} files)")
+    # Create visualizations
+    if results:
+        visualize_results(results, top_airfoils)
+        
+    print("\nVariation study completed!")
+    print(f"PARSEC parameter files: {OUTPUT_DIR_PARSEC} ({len(all_names)} files)")
     print(f"Airfoil DAT files: {OUTPUT_DIR_DAT}")
     print(f"Visualization results: {RESULTS_DIR}")
-
 
 if __name__ == "__main__":
     main()

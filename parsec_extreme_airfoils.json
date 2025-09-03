@@ -1,0 +1,46 @@
+{
+  "rLE": {
+    "min_airfoil": "jx-gs-15",
+    "max_airfoil": "apex16"
+  },
+  "x_up": {
+    "min_airfoil": "ah81k144wfKlappe",
+    "max_airfoil": "dfvlrr4"
+  },
+  "y_up": {
+    "min_airfoil": "dfvlrr4",
+    "max_airfoil": "ah93w480b"
+  },
+  "ypp_up": {
+    "min_airfoil": "ah81k144wfKlappe",
+    "max_airfoil": "clarkk"
+  },
+  "x_lo": {
+    "min_airfoil": "daytonwright6",
+    "max_airfoil": "coanda3"
+  },
+  "y_lo": {
+    "min_airfoil": "ah93w480b",
+    "max_airfoil": "ah7476"
+  },
+  "ypp_lo": {
+    "min_airfoil": "ah7476",
+    "max_airfoil": "chen"
+  },
+  "te_thickness": {
+    "min_airfoil": "s8066",
+    "max_airfoil": "dfvlrr4"
+  },
+  "te_camber": {
+    "min_airfoil": "ah93w480b",
+    "max_airfoil": "dfvlrr4"
+  },
+  "te_angle": {
+    "min_airfoil": "ch10sm",
+    "max_airfoil": "dbln526"
+  },
+  "te_wedge": {
+    "min_airfoil": "ah93w480b",
+    "max_airfoil": "ah79100b"
+  }
+}

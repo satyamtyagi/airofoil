@@ -1,0 +1,12 @@
+# PARSEC parameters for be50sm with Yte -5%
+rLE = 0.100000
+Xup = 0.190076
+Yup = 0.010000
+YXXup = 0.000000
+Xlo = 0.125831
+Ylo = -0.010062
+YXXlo = 1.647210
+Xte = 0.950000
+Yte = 0.007516
+Yte' = -0.200000
+Δyte'' = 0.000000

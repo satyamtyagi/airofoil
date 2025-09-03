@@ -1,0 +1,14 @@
+# PARSEC parameters for ag44ct02r
+# Fit error: 1e+06
+# Geometry valid: False
+rLE = 0.01
+Xup = 0.274461745
+Yup = 0.0566920978
+YXXup = -0.5
+Xlo = 0.163358634
+Ylo = -0.018658
+YXXlo = 0.5
+Xte = 1
+Yte = 0.0012980978
+AlphaTE = 0
+DeltaAlphaTE = 0

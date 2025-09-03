@@ -1,0 +1,14 @@
+# PARSEC parameters for b737d
+# Fit error: nan
+# Geometry valid: False
+rLE = 0.01
+Xup = 0.95
+Yup = 0.3
+YXXup = -0.5
+Xlo = 0.05
+Ylo = -0.0404
+YXXlo = 0.5
+Xte = 1
+Yte = 0
+AlphaTE = 0
+DeltaAlphaTE = 0
