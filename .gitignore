@@ -43,10 +43,20 @@ env/
 .DS_Store
 Thumbs.db
 
-# Generated visualizations
-# Uncomment if you don't want to include visualizations in git
-# *.png
+# Generated visualizations and data files
+*.png
+*.pdf
+*.html
+*.parsec
 
 # Large data files
 *.h5
 *.hdf5
+
+# Airfoil variation files and directories
+simple_variations_dat/
+simple_variations_parsec/
+variation_results/
+parsec_results/
+parameter_sweep_results/
+visualization_output/
